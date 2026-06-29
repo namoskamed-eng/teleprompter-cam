@@ -5,479 +5,575 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Teleprompter Cam</title>
+<title>Teleprompter Cam Pro</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+:root { --accent: #e63946; --bg: #0a0a0f; --card: #151520; --border: #2a2a3a; --text: #eee; --dim: #777; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, 'SF Pro', sans-serif; overflow: hidden; height: 100dvh; width: 100vw; position: fixed; }
 
-:root {
-  --text-size: 28px;
-  --scroll-speed: 40;
-  --text-opacity: 0.85;
+/* ===== MODE SELECT ===== */
+#mode-select {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; padding: 24px; gap: 20px;
 }
-
-body {
-  background: #000;
-  color: #fff;
-  font-family: -apple-system, system-ui, sans-serif;
-  overflow: hidden;
-  height: 100dvh;
-  width: 100vw;
-  position: fixed;
-  top: 0;
-  left: 0;
-}
-
-/* Camera preview */
-#camera {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
-  z-index: 1;
-}
-
-/* Teleprompter overlay */
-#prompter-container {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 10;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-}
-
-#prompter-viewport {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-  mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
-}
-
-#prompter-text {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  padding: 45vh 8% 80vh 8%;
-  font-size: var(--text-size);
-  line-height: 1.6;
-  color: #fff;
-  text-shadow: 0 0 8px rgba(0,0,0,0.9), 0 2px 4px rgba(0,0,0,0.8);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  transform: translateY(0);
-  transition: none;
-}
-
-/* Center guide line */
-#guide-line {
-  position: fixed;
-  top: 50%;
-  left: 5%;
-  right: 5%;
-  height: 2px;
-  background: rgba(255, 80, 80, 0.4);
-  z-index: 11;
-  pointer-events: none;
-}
-
-/* Recording indicator */
-#rec-indicator {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 20;
-  display: none;
-  align-items: center;
-  gap: 8px;
-  background: rgba(0,0,0,0.5);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-#rec-indicator.active { display: flex; }
-
-#rec-dot {
-  width: 12px; height: 12px;
-  background: #f00;
-  border-radius: 50%;
-  animation: blink 1s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-#rec-timer {
-  font-variant-numeric: tabular-nums;
-}
-
-/* Controls HUD */
-#hud {
-  position: fixed;
-  bottom: 0;
-  left: 0; right: 0;
-  z-index: 20;
-  padding: 12px 16px;
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
-  background: linear-gradient(transparent, rgba(0,0,0,0.7));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  transition: opacity 0.3s;
-}
-
-#hud.hidden { opacity: 0; pointer-events: none; }
-
-.hud-btn {
-  width: 56px; height: 56px;
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.6);
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  flex-shrink: 0;
-}
-
-.hud-btn:active { background: rgba(255,255,255,0.3); }
-
-#btn-record {
-  width: 72px; height: 72px;
-  border: 3px solid #fff;
-}
-
-#btn-record .rec-inner {
-  width: 32px; height: 32px;
-  background: #f00;
-  border-radius: 50%;
+#mode-select h1 { font-size: 28px; font-weight: 800; }
+#mode-select p { color: var(--dim); font-size: 14px; text-align: center; max-width: 320px; }
+.mode-cards { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.mode-card {
+  background: var(--card); border: 2px solid var(--border); border-radius: 16px;
+  padding: 28px 24px; width: 160px; text-align: center; cursor: pointer;
   transition: all 0.2s;
 }
+.mode-card:active { transform: scale(0.96); }
+.mode-card:hover { border-color: var(--accent); }
+.mode-card .icon { font-size: 40px; margin-bottom: 12px; }
+.mode-card h3 { font-size: 16px; margin-bottom: 4px; }
+.mode-card p { font-size: 12px; color: var(--dim); }
 
-#btn-record.recording .rec-inner {
-  border-radius: 6px;
-  width: 24px; height: 24px;
+/* ===== SCREENS ===== */
+.screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ===== CAMERA SETUP ===== */
+#camera-setup { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 20px 16px 120px; }
+#camera-setup h2 { font-size: 22px; font-weight: 700; margin-bottom: 16px; text-align: center; }
+.form-section { margin-bottom: 20px; }
+.form-section label { display: block; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.form-section textarea {
+  width: 100%; min-height: 140px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 15px; padding: 14px; resize: vertical;
+  font-family: inherit; line-height: 1.5;
+}
+.form-section textarea::placeholder { color: #555; }
+.form-section select, .form-section input[type="text"] {
+  width: 100%; padding: 12px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 15px;
+}
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+.slider-row .val { min-width: 44px; text-align: right; font-size: 14px; font-weight: 600; }
+.btn-primary {
+  width: 100%; padding: 16px; background: var(--accent); color: #fff; border: none;
+  border-radius: 12px; font-size: 17px; font-weight: 700; cursor: pointer;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.btn-primary:active { opacity: 0.8; }
+.info-box {
+  background: #1a1a2e; border-radius: 10px; padding: 14px; margin-top: 12px;
+}
+.info-box h4 { font-size: 13px; color: #88f; margin-bottom: 8px; }
+.info-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid #252540; }
+.info-row:last-child { border-bottom: none; }
+.info-row .k { color: #aaf; font-weight: 600; }
+.info-row .v { color: var(--dim); }
+
+/* ===== CAMERA LIVE ===== */
+#camera-live { background: #000; }
+#cam-video {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 1;
+}
+#cam-video.mirrored { transform: scaleX(-1); }
+
+/* Prompter */
+#prompter-wrap {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+  overflow: hidden;
+}
+#prompter-body {
+  position: absolute; top: 0; left: 0; width: 100%;
+  padding: 45vh 7% 80vh 7%; font-size: 28px; line-height: 1.55; font-weight: 600;
+  color: #fff; text-shadow: 0 0 10px rgba(0,0,0,0.95), 0 2px 6px rgba(0,0,0,0.8);
+  letter-spacing: 0.01em;
+}
+#guide { position: fixed; top: 50%; left: 4%; right: 4%; height: 2px; background: rgba(255,60,60,0.35); z-index: 11; pointer-events: none; }
+
+/* Recording badge */
+#rec-badge {
+  position: fixed; top: 14px; right: 14px; z-index: 30;
+  display: none; align-items: center; gap: 7px;
+  background: rgba(0,0,0,0.55); padding: 5px 12px; border-radius: 18px; font-size: 13px; font-weight: 700;
+}
+#rec-badge.on { display: flex; }
+#rec-badge .dot { width: 10px; height: 10px; background: red; border-radius: 50%; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* Connection badge */
+#conn-badge {
+  position: fixed; top: 14px; left: 14px; z-index: 30;
+  background: rgba(0,0,0,0.55); padding: 5px 12px; border-radius: 18px; font-size: 12px; font-weight: 600;
+  display: none;
+}
+#conn-badge.on { display: block; color: #4f4; }
+
+/* Speed badge */
+#spd-badge {
+  position: fixed; top: 42px; left: 14px; z-index: 30;
+  background: rgba(0,0,0,0.45); padding: 4px 10px; border-radius: 14px; font-size: 12px; font-weight: 600; opacity: .7;
 }
 
-/* Speed indicator */
-#speed-display {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 20;
-  background: rgba(0,0,0,0.5);
-  padding: 6px 12px;
-  border-radius: 16px;
-  font-size: 13px;
-  font-weight: 600;
-  opacity: 0.8;
+/* Camera controls panel */
+#cam-controls {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+  background: linear-gradient(transparent, rgba(0,0,0,0.85) 30%);
+  padding: 40px 12px 12px; padding-bottom: max(12px, env(safe-area-inset-bottom));
+  transition: transform 0.3s;
+}
+#cam-controls.collapsed { transform: translateY(calc(100% - 80px)); }
+.ctrl-toggle {
+  text-align: center; padding: 8px; cursor: pointer; font-size: 12px; color: var(--dim);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+
+/* Control tabs */
+.ctrl-tabs { display: flex; gap: 4px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px; }
+.ctrl-tab {
+  padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600;
+  background: rgba(255,255,255,0.1); color: var(--dim); cursor: pointer; white-space: nowrap;
+  border: none;
+}
+.ctrl-tab.active { background: var(--accent); color: #fff; }
+.ctrl-panel { display: none; }
+.ctrl-panel.active { display: block; }
+
+/* Control sliders */
+.ctrl-slider { margin-bottom: 10px; }
+.ctrl-slider .ctrl-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+.ctrl-slider .ctrl-label span:first-child { color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
+.ctrl-slider .ctrl-label span:last-child { font-weight: 600; }
+.ctrl-slider input[type="range"] { width: 100%; accent-color: var(--accent); }
+.ctrl-slider select { width: 100%; padding: 8px; background: #222; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 13px; }
+
+/* Bottom action bar */
+.action-bar {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);
+}
+.act-btn {
+  width: 48px; height: 48px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.1); color: #fff; font-size: 18px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.act-btn:active { background: rgba(255,255,255,0.25); }
+#btn-rec {
+  width: 68px; height: 68px; border: 3px solid #fff;
+}
+#btn-rec .inner { width: 28px; height: 28px; background: red; border-radius: 50%; transition: all .2s; }
+#btn-rec.on .inner { border-radius: 5px; width: 22px; height: 22px; }
+
+/* ===== MONITOR SETUP ===== */
+#monitor-setup {
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 20px 16px; align-items: center; justify-content: center; text-align: center; gap: 16px;
+}
+#monitor-setup h2 { font-size: 22px; font-weight: 700; }
+#monitor-setup p { color: var(--dim); font-size: 14px; max-width: 340px; }
+#room-input {
+  width: 100%; max-width: 300px; padding: 14px; background: var(--card); border: 2px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 24px; text-align: center;
+  font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+}
+#room-input::placeholder { color: #444; font-weight: 400; letter-spacing: 0; font-size: 16px; }
+.btn-connect {
+  padding: 14px 40px; background: var(--accent); color: #fff; border: none;
+  border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer;
+}
+#monitor-status { font-size: 14px; color: var(--dim); min-height: 20px; }
+
+/* ===== MONITOR LIVE ===== */
+#monitor-live { background: #000; }
+#mon-video {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  object-fit: contain; z-index: 1; background: #000;
+}
+
+/* Monitor controls */
+#mon-controls {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+  background: linear-gradient(transparent, rgba(0,0,0,0.9) 25%);
+  padding: 40px 12px 12px; padding-bottom: max(12px, env(safe-area-inset-bottom));
+  transition: transform 0.3s;
+}
+#mon-controls.collapsed { transform: translateY(calc(100% - 80px)); }
+
+/* Room code display */
+#room-display {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30;
+  background: rgba(0,0,0,0.6); padding: 6px 16px; border-radius: 18px;
+  font-size: 14px; font-weight: 700; letter-spacing: 0.1em;
 }
 
 /* Gamepad indicator */
-#gamepad-status {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 20;
-  background: rgba(0,0,0,0.5);
-  padding: 6px 14px;
-  border-radius: 16px;
-  font-size: 13px;
-  font-weight: 600;
-  display: none;
+#gp-indicator {
+  position: fixed; top: 44px; right: 14px; z-index: 30;
+  background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 14px;
+  font-size: 11px; font-weight: 600; display: none;
 }
+#gp-indicator.on { display: block; color: #4f4; }
 
-#gamepad-status.connected {
-  display: block;
-  color: #4f4;
+/* Responsive */
+@media (min-width: 768px) {
+  .mode-card { width: 200px; padding: 36px 28px; }
 }
-
-/* Setup screen */
-#setup {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 100;
-  background: #111;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-#setup.hidden { display: none; }
-
-#setup-header {
-  padding: 20px 16px 12px;
-  text-align: center;
-}
-
-#setup-header h1 {
-  font-size: 24px;
-  font-weight: 800;
-}
-
-#setup-header p {
-  font-size: 14px;
-  color: #888;
-  margin-top: 4px;
-}
-
-#setup-content {
-  flex: 1;
-  padding: 0 16px 100px;
-}
-
-#script-input {
-  width: 100%;
-  min-height: 200px;
-  background: #222;
-  border: 1px solid #444;
-  border-radius: 12px;
-  color: #fff;
-  font-size: 16px;
-  padding: 16px;
-  resize: vertical;
-  font-family: inherit;
-  line-height: 1.5;
-}
-
-#script-input::placeholder { color: #666; }
-
-.setting-group {
-  margin-top: 20px;
-}
-
-.setting-group label {
-  display: block;
-  font-size: 13px;
-  color: #888;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.setting-group input[type="range"] {
-  width: 100%;
-  accent-color: #f00;
-}
-
-.setting-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.setting-value {
-  font-size: 14px;
-  font-weight: 600;
-  min-width: 40px;
-  text-align: right;
-}
-
-.camera-select {
-  width: 100%;
-  padding: 12px;
-  background: #222;
-  border: 1px solid #444;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 16px;
-}
-
-#btn-start {
-  position: fixed;
-  bottom: 0;
-  left: 0; right: 0;
-  padding: 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 101;
-  background: linear-gradient(transparent, #111 30%);
-}
-
-#btn-start button {
-  width: 100%;
-  padding: 16px;
-  background: #f00;
-  color: #fff;
-  border: none;
-  border-radius: 12px;
-  font-size: 18px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-#btn-start button:active { background: #c00; }
-
-/* Controller help */
-.controller-help {
-  margin-top: 24px;
-  background: #1a1a2e;
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.controller-help h3 {
-  font-size: 14px;
-  color: #88f;
-  margin-bottom: 12px;
-}
-
-.controller-help .mapping {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-  font-size: 14px;
-  border-bottom: 1px solid #2a2a3e;
-}
-
-.controller-help .mapping:last-child { border-bottom: none; }
-
-.mapping .btn-name { color: #aaf; font-weight: 600; }
-.mapping .btn-action { color: #888; }
-
-/* Mirror toggle */
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 16px;
-}
-
-.toggle {
-  width: 48px; height: 28px;
-  background: #444;
-  border-radius: 14px;
-  position: relative;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.toggle.on { background: #f00; }
-
-.toggle::after {
-  content: '';
-  width: 22px; height: 22px;
-  background: #fff;
-  border-radius: 50%;
-  position: absolute;
-  top: 3px; left: 3px;
-  transition: transform 0.2s;
-}
-
-.toggle.on::after { transform: translateX(20px); }
 </style>
 </head>
 <body>
 
-<!-- Setup Screen -->
-<div id="setup">
-  <div id="setup-header">
-    <h1>📹 Teleprompter Cam</h1>
-    <p>Cole seu roteiro e comece a gravar</p>
+<!-- ===== MODE SELECT ===== -->
+<div id="mode-select">
+  <h1>📹 Teleprompter Cam Pro</h1>
+  <p>Câmera com controles manuais, teleprompter e monitoramento remoto</p>
+  <div class="mode-cards">
+    <div class="mode-card" onclick="enterMode('camera')">
+      <div class="icon">🎥</div>
+      <h3>Câmera</h3>
+      <p>Gravar com teleprompter e controles manuais</p>
+    </div>
+    <div class="mode-card" onclick="enterMode('monitor')">
+      <div class="icon">🖥️</div>
+      <h3>Monitor</h3>
+      <p>Ver e controlar a câmera remotamente</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CAMERA SETUP ===== -->
+<div id="camera-setup" class="screen">
+  <h2>🎥 Configurar Câmera</h2>
+
+  <div class="form-section">
+    <label>Roteiro (teleprompter)</label>
+    <textarea id="script-input" placeholder="Cole ou digite seu roteiro aqui..."></textarea>
   </div>
 
-  <div id="setup-content">
-    <textarea id="script-input" placeholder="Cole ou digite seu roteiro aqui...
+  <div class="form-section">
+    <label>Câmera</label>
+    <select id="cam-select"><option>Carregando...</option></select>
+  </div>
 
-Cada parágrafo será exibido como um bloco de texto no teleprompter.
+  <div class="form-section">
+    <label>Velocidade do texto</label>
+    <div class="slider-row">
+      <input type="range" id="set-speed" min="10" max="100" value="40" step="5">
+      <span class="val" id="set-speed-val">40</span>
+    </div>
+  </div>
 
-Dica: conecte seu controle de PS4 via Bluetooth antes de começar!"></textarea>
+  <div class="form-section">
+    <label>Tamanho do texto</label>
+    <div class="slider-row">
+      <input type="range" id="set-size" min="18" max="52" value="28" step="2">
+      <span class="val" id="set-size-val">28px</span>
+    </div>
+  </div>
 
-    <div class="setting-group">
-      <label>Câmera</label>
-      <select id="camera-select" class="camera-select">
-        <option value="">Carregando câmeras...</option>
-      </select>
+  <div class="form-section">
+    <label style="display:flex;align-items:center;justify-content:space-between;text-transform:none;font-size:14px">
+      Espelhar câmera
+      <div id="mirror-tog" class="toggle-sw on" onclick="this.classList.toggle('on')"></div>
+    </label>
+  </div>
+
+  <div class="form-section">
+    <label style="display:flex;align-items:center;justify-content:space-between;text-transform:none;font-size:14px">
+      Permitir monitoramento remoto
+      <div id="remote-tog" class="toggle-sw on" onclick="this.classList.toggle('on')"></div>
+    </label>
+  </div>
+
+  <div class="info-box">
+    <h4>🎮 Controle PS4</h4>
+    <div class="info-row"><span class="k">✕ Cross</span><span class="v">Gravar / Parar</span></div>
+    <div class="info-row"><span class="k">○ Circle</span><span class="v">Pausar / Retomar texto</span></div>
+    <div class="info-row"><span class="k">△ Triangle</span><span class="v">Reiniciar texto</span></div>
+    <div class="info-row"><span class="k">□ Square</span><span class="v">Mostrar / Ocultar painel</span></div>
+    <div class="info-row"><span class="k">D-Pad ↑↓</span><span class="v">Velocidade texto</span></div>
+    <div class="info-row"><span class="k">D-Pad ←→</span><span class="v">Tamanho texto</span></div>
+    <div class="info-row"><span class="k">L1 / R1</span><span class="v">Opacidade texto</span></div>
+    <div class="info-row"><span class="k">L2 / R2</span><span class="v">Zoom -/+</span></div>
+    <div class="info-row"><span class="k">Options</span><span class="v">Voltar ao menu</span></div>
+  </div>
+
+  <div style="height:80px"></div>
+  <button class="btn-primary" onclick="startCamera()">Iniciar Câmera</button>
+</div>
+
+<!-- ===== CAMERA LIVE ===== -->
+<div id="camera-live" class="screen">
+  <video id="cam-video" autoplay playsinline muted></video>
+
+  <div id="prompter-wrap">
+    <div id="prompter-body"></div>
+  </div>
+  <div id="guide"></div>
+
+  <div id="rec-badge"><div class="dot"></div><span id="rec-time">00:00</span></div>
+  <div id="conn-badge">● Monitor conectado</div>
+  <div id="spd-badge">⏩ 40</div>
+  <div id="gp-indicator">🎮 Controle</div>
+  <div id="room-display" style="display:none"></div>
+
+  <div id="cam-controls">
+    <div class="ctrl-toggle" onclick="toggleControls('cam-controls')">▲ Controles ▲</div>
+
+    <div class="ctrl-tabs" id="cam-tabs">
+      <button class="ctrl-tab active" data-tab="tab-exposure">Exposição</button>
+      <button class="ctrl-tab" data-tab="tab-focus">Foco</button>
+      <button class="ctrl-tab" data-tab="tab-color">Cor</button>
+      <button class="ctrl-tab" data-tab="tab-zoom">Zoom</button>
+      <button class="ctrl-tab" data-tab="tab-filters">Filtros</button>
     </div>
 
-    <div class="setting-group">
-      <label>Velocidade do texto</label>
-      <div class="setting-row">
-        <input type="range" id="speed-range" min="10" max="100" value="40" step="5">
-        <span class="setting-value" id="speed-value">40</span>
+    <!-- Exposure -->
+    <div class="ctrl-panel active" id="tab-exposure">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Modo Exposição</span><span id="v-exp-mode">auto</span></div>
+        <select id="c-exp-mode" onchange="setCamProp('exposureMode',this.value)">
+          <option value="continuous">Auto</option><option value="manual">Manual</option>
+        </select>
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Compensação EV</span><span id="v-exp-comp">0</span></div>
+        <input type="range" id="c-exp-comp" min="-3" max="3" step="0.1" value="0" oninput="setCamProp('exposureCompensation',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>ISO</span><span id="v-iso">auto</span></div>
+        <input type="range" id="c-iso" min="50" max="3200" step="50" value="100" oninput="setCamProp('iso',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Shutter Speed</span><span id="v-shutter">auto</span></div>
+        <input type="range" id="c-shutter" min="100" max="100000" step="100" value="10000" oninput="setCamProp('exposureTime',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Brilho</span><span id="v-brightness">128</span></div>
+        <input type="range" id="c-brightness" min="0" max="255" step="1" value="128" oninput="setCamProp('brightness',+this.value)">
       </div>
     </div>
 
-    <div class="setting-group">
-      <label>Tamanho do texto</label>
-      <div class="setting-row">
-        <input type="range" id="size-range" min="18" max="48" value="28" step="2">
-        <span class="setting-value" id="size-value">28px</span>
+    <!-- Focus -->
+    <div class="ctrl-panel" id="tab-focus">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Modo Foco</span><span id="v-focus-mode">auto</span></div>
+        <select id="c-focus-mode" onchange="setCamProp('focusMode',this.value)">
+          <option value="continuous">Auto Contínuo</option><option value="single-shot">Single</option><option value="manual">Manual</option>
+        </select>
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Distância Foco</span><span id="v-focus-dist">auto</span></div>
+        <input type="range" id="c-focus-dist" min="0" max="1000" step="10" value="0" oninput="setCamProp('focusDistance',+this.value)">
       </div>
     </div>
 
-    <div class="toggle-row">
-      <label style="font-size:14px">Espelhar câmera</label>
-      <div id="mirror-toggle" class="toggle on"></div>
+    <!-- Color -->
+    <div class="ctrl-panel" id="tab-color">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>White Balance</span><span id="v-wb-mode">auto</span></div>
+        <select id="c-wb-mode" onchange="setCamProp('whiteBalanceMode',this.value)">
+          <option value="continuous">Auto</option><option value="manual">Manual</option>
+        </select>
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Temperatura (K)</span><span id="v-color-temp">5500</span></div>
+        <input type="range" id="c-color-temp" min="2500" max="10000" step="100" value="5500" oninput="setCamProp('colorTemperature',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Saturação</span><span id="v-saturation">128</span></div>
+        <input type="range" id="c-saturation" min="0" max="255" step="1" value="128" oninput="setCamProp('saturation',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Contraste</span><span id="v-contrast">128</span></div>
+        <input type="range" id="c-contrast" min="0" max="255" step="1" value="128" oninput="setCamProp('contrast',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Nitidez</span><span id="v-sharpness">128</span></div>
+        <input type="range" id="c-sharpness" min="0" max="255" step="1" value="128" oninput="setCamProp('sharpness',+this.value)">
+      </div>
     </div>
 
-    <div class="controller-help">
-      <h3>🎮 Controle PS4 (DualShock 4)</h3>
-      <div class="mapping"><span class="btn-name">✕ (Cross)</span><span class="btn-action">Gravar / Parar</span></div>
-      <div class="mapping"><span class="btn-name">○ (Circle)</span><span class="btn-action">Pausar / Retomar texto</span></div>
-      <div class="mapping"><span class="btn-name">△ (Triangle)</span><span class="btn-action">Reiniciar texto</span></div>
-      <div class="mapping"><span class="btn-name">□ (Square)</span><span class="btn-action">Mostrar / Ocultar HUD</span></div>
-      <div class="mapping"><span class="btn-name">D-Pad ↑ / ↓</span><span class="btn-action">Velocidade +/-</span></div>
-      <div class="mapping"><span class="btn-name">D-Pad ← / →</span><span class="btn-action">Tamanho texto +/-</span></div>
-      <div class="mapping"><span class="btn-name">L1 / R1</span><span class="btn-action">Opacidade texto +/-</span></div>
-      <div class="mapping"><span class="btn-name">Options</span><span class="btn-action">Voltar ao setup</span></div>
+    <!-- Zoom -->
+    <div class="ctrl-panel" id="tab-zoom">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Zoom</span><span id="v-zoom">1.0x</span></div>
+        <input type="range" id="c-zoom" min="1" max="10" step="0.1" value="1" oninput="setCamProp('zoom',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Torch (Lanterna)</span><span id="v-torch">off</span></div>
+        <select id="c-torch" onchange="setCamProp('torch',this.value==='on')">
+          <option value="off">Off</option><option value="on">On</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="ctrl-panel" id="tab-filters">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Filtro CSS</span><span id="v-filter">Nenhum</span></div>
+        <select id="c-filter" onchange="applyFilter(this.value)">
+          <option value="none">Nenhum</option>
+          <option value="grayscale(100%)">P&B</option>
+          <option value="sepia(80%)">Sépia</option>
+          <option value="contrast(1.3) saturate(1.2)">Cinema Quente</option>
+          <option value="contrast(1.2) saturate(0.8) brightness(1.1)">Cinema Frio</option>
+          <option value="contrast(1.4) brightness(0.9) saturate(1.3)">Alto Contraste</option>
+          <option value="hue-rotate(180deg)">Invertido</option>
+          <option value="brightness(1.15) contrast(1.1) saturate(1.1)">Brilhante</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--dim);margin-top:8px">Filtros CSS são aplicados apenas na visualização. O vídeo gravado pode incluí-los via canvas (futuro).</p>
+    </div>
+
+    <div class="action-bar">
+      <button class="act-btn" onclick="adjustSpeed(-5)">⏪</button>
+      <button class="act-btn" onclick="toggleScroll()" id="btn-pause">⏸</button>
+      <button class="act-btn" id="btn-rec" onclick="toggleRec()"><div class="inner"></div></button>
+      <button class="act-btn" onclick="resetScroll()">↺</button>
+      <button class="act-btn" onclick="adjustSpeed(5)">⏩</button>
     </div>
   </div>
+</div>
 
-  <div id="btn-start">
-    <button onclick="startApp()">Iniciar</button>
+<!-- ===== MONITOR SETUP ===== -->
+<div id="monitor-setup" class="screen">
+  <h2>🖥️ Monitor Remoto</h2>
+  <p>Digite o código exibido na tela da câmera para conectar</p>
+  <input type="text" id="room-input" placeholder="Código" maxlength="6" autocapitalize="characters" spellcheck="false">
+  <button class="btn-connect" onclick="connectMonitor()">Conectar</button>
+  <div id="monitor-status"></div>
+</div>
+
+<!-- ===== MONITOR LIVE ===== -->
+<div id="monitor-live" class="screen">
+  <video id="mon-video" autoplay playsinline></video>
+
+  <div id="mon-controls">
+    <div class="ctrl-toggle" onclick="toggleControls('mon-controls')">▲ Controles Remotos ▲</div>
+
+    <div class="ctrl-tabs" id="mon-tabs">
+      <button class="ctrl-tab active" data-tab="mtab-exposure">Exposição</button>
+      <button class="ctrl-tab" data-tab="mtab-focus">Foco</button>
+      <button class="ctrl-tab" data-tab="mtab-color">Cor</button>
+      <button class="ctrl-tab" data-tab="mtab-zoom">Zoom</button>
+      <button class="ctrl-tab" data-tab="mtab-prompter">Teleprompter</button>
+    </div>
+
+    <div class="ctrl-panel active" id="mtab-exposure">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Modo Exposição</span></div>
+        <select id="mc-exp-mode" onchange="sendCmd('exposureMode',this.value)">
+          <option value="continuous">Auto</option><option value="manual">Manual</option>
+        </select>
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Compensação EV</span><span id="mv-exp-comp">0</span></div>
+        <input type="range" id="mc-exp-comp" min="-3" max="3" step="0.1" value="0" oninput="sendCmd('exposureCompensation',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>ISO</span><span id="mv-iso">100</span></div>
+        <input type="range" id="mc-iso" min="50" max="3200" step="50" value="100" oninput="sendCmd('iso',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Brilho</span><span id="mv-brightness">128</span></div>
+        <input type="range" id="mc-brightness" min="0" max="255" step="1" value="128" oninput="sendCmd('brightness',+this.value)">
+      </div>
+    </div>
+
+    <div class="ctrl-panel" id="mtab-focus">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Modo Foco</span></div>
+        <select id="mc-focus-mode" onchange="sendCmd('focusMode',this.value)">
+          <option value="continuous">Auto Contínuo</option><option value="single-shot">Single</option><option value="manual">Manual</option>
+        </select>
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Distância Foco</span><span id="mv-focus-dist">0</span></div>
+        <input type="range" id="mc-focus-dist" min="0" max="1000" step="10" value="0" oninput="sendCmd('focusDistance',+this.value)">
+      </div>
+    </div>
+
+    <div class="ctrl-panel" id="mtab-color">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>White Balance</span></div>
+        <select id="mc-wb-mode" onchange="sendCmd('whiteBalanceMode',this.value)">
+          <option value="continuous">Auto</option><option value="manual">Manual</option>
+        </select>
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Temperatura (K)</span><span id="mv-color-temp">5500</span></div>
+        <input type="range" id="mc-color-temp" min="2500" max="10000" step="100" value="5500" oninput="sendCmd('colorTemperature',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Saturação</span><span id="mv-saturation">128</span></div>
+        <input type="range" id="mc-saturation" min="0" max="255" step="1" value="128" oninput="sendCmd('saturation',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Contraste</span><span id="mv-contrast">128</span></div>
+        <input type="range" id="mc-contrast" min="0" max="255" step="1" value="128" oninput="sendCmd('contrast',+this.value)">
+      </div>
+    </div>
+
+    <div class="ctrl-panel" id="mtab-zoom">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Zoom</span><span id="mv-zoom">1.0x</span></div>
+        <input type="range" id="mc-zoom" min="1" max="10" step="0.1" value="1" oninput="sendCmd('zoom',+this.value)">
+      </div>
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Torch</span></div>
+        <select id="mc-torch" onchange="sendCmd('torch',this.value==='on')">
+          <option value="off">Off</option><option value="on">On</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="ctrl-panel" id="mtab-prompter">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Velocidade Texto</span><span id="mv-speed">40</span></div>
+        <input type="range" id="mc-speed" min="10" max="100" step="5" value="40" oninput="sendCmd('scrollSpeed',+this.value)">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="act-btn" style="flex:1;border-radius:8px;height:40px" onclick="sendCmd('toggleScroll',true)">⏯ Pausar/Retomar</button>
+        <button class="act-btn" style="flex:1;border-radius:8px;height:40px" onclick="sendCmd('resetScroll',true)">↺ Reiniciar</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="act-btn" style="flex:1;border-radius:8px;height:40px;background:rgba(230,57,70,0.3);border-color:var(--accent)" onclick="sendCmd('toggleRec',true)">⏺ Gravar/Parar</button>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="act-btn" onclick="sendCmd('scrollSpeed','dec')">⏪</button>
+      <button class="act-btn" onclick="sendCmd('toggleScroll',true)">⏯</button>
+      <button class="act-btn" style="width:68px;height:68px;border-width:3px;border-color:#fff" onclick="sendCmd('toggleRec',true)"><div class="inner" style="width:28px;height:28px;background:red;border-radius:50%"></div></button>
+      <button class="act-btn" onclick="sendCmd('resetScroll',true)">↺</button>
+      <button class="act-btn" onclick="sendCmd('scrollSpeed','inc')">⏩</button>
+    </div>
   </div>
 </div>
 
-<!-- Camera View -->
-<video id="camera" autoplay playsinline muted></video>
-
-<!-- Teleprompter -->
-<div id="prompter-container">
-  <div id="prompter-viewport">
-    <div id="prompter-text"></div>
-  </div>
-</div>
-
-<div id="guide-line"></div>
-
-<!-- HUD -->
-<div id="speed-display">⏩ 40 px/s</div>
-
-<div id="rec-indicator">
-  <div id="rec-dot"></div>
-  <span id="rec-timer">00:00</span>
-</div>
-
-<div id="gamepad-status">🎮 Controle conectado</div>
-
-<div id="hud">
-  <button class="hud-btn" onclick="adjustSpeed(-5)" title="Mais lento">⏪</button>
-  <button class="hud-btn" onclick="toggleScroll()" id="btn-pause" title="Pausar">⏸</button>
-  <button class="hud-btn" id="btn-record" onclick="toggleRecording()" title="Gravar">
-    <div class="rec-inner"></div>
-  </button>
-  <button class="hud-btn" onclick="resetScroll()" title="Reiniciar">↺</button>
-  <button class="hud-btn" onclick="adjustSpeed(5)" title="Mais rápido">⏩</button>
-</div>
+<!-- Toggle switch style -->
+<style>
+.toggle-sw {
+  width: 48px; height: 28px; background: #444; border-radius: 14px;
+  position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0;
+}
+.toggle-sw.on { background: var(--accent); }
+.toggle-sw::after {
+  content:''; width:22px; height:22px; background:#fff; border-radius:50%;
+  position:absolute; top:3px; left:3px; transition: transform .2s;
+}
+.toggle-sw.on::after { transform: translateX(20px); }
+</style>
 
 <script>
+// ===== STATE =====
+let mode = null; // 'camera' | 'monitor'
 let stream = null;
+let videoTrack = null;
+let capabilities = {};
 let mediaRecorder = null;
-let recordedChunks = [];
+let chunks = [];
 let isRecording = false;
 let isScrolling = true;
 let scrollPos = 0;
@@ -485,337 +581,467 @@ let scrollSpeed = 40;
 let textSize = 28;
 let textOpacity = 0.85;
 let isMirrored = true;
-let recStartTime = 0;
-let recTimerInterval = null;
-let animFrameId = null;
-let lastTime = 0;
-let gamepadIndex = -1;
-let prevButtons = [];
-let hudVisible = true;
+let recStart = 0;
+let recInterval = null;
+let animId = null;
+let lastT = 0;
+let gpIndex = -1;
+let prevBtns = [];
+let peer = null;
+let dataConn = null;
+let mediaConn = null;
+let roomCode = '';
 
-const camera = document.getElementById('camera');
-const prompterText = document.getElementById('prompter-text');
-const speedDisplay = document.getElementById('speed-display');
-const recIndicator = document.getElementById('rec-indicator');
-const recTimer = document.getElementById('rec-timer');
-const hud = document.getElementById('hud');
-const setup = document.getElementById('setup');
-const btnRecord = document.getElementById('btn-record');
-const btnPause = document.getElementById('btn-pause');
-const gamepadStatus = document.getElementById('gamepad-status');
-
-async function loadCameras() {
-  try {
-    await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = devices.filter(d => d.kind === 'videoinput');
-    const select = document.getElementById('camera-select');
-    select.innerHTML = '';
-    videoDevices.forEach((d, i) => {
-      const opt = document.createElement('option');
-      opt.value = d.deviceId;
-      opt.textContent = d.label || `Câmera ${i + 1}`;
-      select.appendChild(opt);
-    });
-    // Prefer back camera on mobile
-    const back = videoDevices.find(d =>
-      d.label.toLowerCase().includes('back') ||
-      d.label.toLowerCase().includes('traseira') ||
-      d.label.toLowerCase().includes('rear')
-    );
-    if (back) select.value = back.deviceId;
-  } catch (e) {
-    console.error('Camera access error:', e);
+// ===== NAVIGATION =====
+function showScreen(id) {
+  document.querySelectorAll('.screen, #mode-select').forEach(el => {
+    el.classList.remove('active');
+    if (el.id === 'mode-select') el.style.display = 'none';
+  });
+  if (id === 'mode-select') {
+    document.getElementById('mode-select').style.display = 'flex';
+  } else {
+    document.getElementById(id).classList.add('active');
   }
 }
 
-async function startApp() {
-  const script = document.getElementById('script-input').value.trim();
-  if (!script) {
-    alert('Cole um roteiro antes de iniciar!');
-    return;
+function enterMode(m) {
+  mode = m;
+  if (m === 'camera') {
+    showScreen('camera-setup');
+    loadCameras();
+  } else {
+    showScreen('monitor-setup');
   }
+}
 
-  const deviceId = document.getElementById('camera-select').value;
-  scrollSpeed = parseInt(document.getElementById('speed-range').value);
-  textSize = parseInt(document.getElementById('size-range').value);
+// ===== TABS =====
+document.addEventListener('click', e => {
+  if (!e.target.classList.contains('ctrl-tab')) return;
+  const tabsContainer = e.target.parentElement;
+  tabsContainer.querySelectorAll('.ctrl-tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  const parent = tabsContainer.parentElement;
+  parent.querySelectorAll('.ctrl-panel').forEach(p => p.classList.remove('active'));
+  parent.querySelector('#' + e.target.dataset.tab).classList.add('active');
+});
 
-  prompterText.textContent = script;
-  document.documentElement.style.setProperty('--text-size', textSize + 'px');
-  prompterText.style.opacity = textOpacity;
-  speedDisplay.textContent = `⏩ ${scrollSpeed} px/s`;
+function toggleControls(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// ===== CAMERA =====
+async function loadCameras() {
+  try {
+    const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    tempStream.getTracks().forEach(t => t.stop());
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const vids = devices.filter(d => d.kind === 'videoinput');
+    const sel = document.getElementById('cam-select');
+    sel.innerHTML = '';
+    vids.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = d.label || `Câmera ${i+1}`;
+      sel.appendChild(o);
+    });
+    const back = vids.find(d => /back|traseira|rear|environment/i.test(d.label));
+    if (back) sel.value = back.deviceId;
+  } catch(e) { console.error(e); }
+}
+
+async function startCamera() {
+  const script = document.getElementById('script-input').value.trim();
+  const deviceId = document.getElementById('cam-select').value;
+  scrollSpeed = +document.getElementById('set-speed').value;
+  textSize = +document.getElementById('set-size').value;
+  isMirrored = document.getElementById('mirror-tog').classList.contains('on');
+  const allowRemote = document.getElementById('remote-tog').classList.contains('on');
+
+  const prompterBody = document.getElementById('prompter-body');
+  prompterBody.textContent = script;
+  prompterBody.style.fontSize = textSize + 'px';
+  prompterBody.style.opacity = textOpacity;
+  document.getElementById('spd-badge').textContent = `⏩ ${scrollSpeed}`;
+
+  if (script) {
+    document.getElementById('prompter-wrap').style.display = '';
+    document.getElementById('guide').style.display = '';
+  } else {
+    document.getElementById('prompter-wrap').style.display = 'none';
+    document.getElementById('guide').style.display = 'none';
+  }
 
   try {
     if (stream) stream.getTracks().forEach(t => t.stop());
-
-    const constraints = {
-      video: {
-        deviceId: deviceId ? { exact: deviceId } : undefined,
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        facingMode: deviceId ? undefined : 'user'
-      },
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: deviceId ? {exact: deviceId} : undefined, width: {ideal: 1920}, height: {ideal: 1080} },
       audio: true
-    };
+    });
+    const vid = document.getElementById('cam-video');
+    vid.srcObject = stream;
+    vid.classList.toggle('mirrored', isMirrored);
 
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
-    camera.srcObject = stream;
-    camera.style.transform = isMirrored ? 'scaleX(-1)' : 'none';
+    videoTrack = stream.getVideoTracks()[0];
+    readCapabilities();
 
-    setup.classList.add('hidden');
+    showScreen('camera-live');
     scrollPos = 0;
-    prompterText.style.transform = 'translateY(0)';
     isScrolling = true;
-    btnPause.textContent = '⏸';
-    lastTime = 0;
-
-    requestFullscreenSafe();
+    lastT = 0;
     startScrollLoop();
-  } catch (e) {
-    alert('Erro ao acessar câmera: ' + e.message);
+    requestWakeLock();
+
+    if (allowRemote) initPeerCamera();
+  } catch(e) {
+    alert('Erro câmera: ' + e.message);
   }
 }
 
-function requestFullscreenSafe() {
-  const el = document.documentElement;
-  if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+function readCapabilities() {
+  if (!videoTrack) return;
+  try {
+    capabilities = videoTrack.getCapabilities() || {};
+  } catch(e) { capabilities = {}; }
+
+  const settings = videoTrack.getSettings();
+  const controlMap = {
+    'zoom': { slider: 'c-zoom', label: 'v-zoom', fmt: v => v.toFixed(1)+'x' },
+    'exposureCompensation': { slider: 'c-exp-comp', label: 'v-exp-comp', fmt: v => v.toFixed(1) },
+    'iso': { slider: 'c-iso', label: 'v-iso' },
+    'exposureTime': { slider: 'c-shutter', label: 'v-shutter' },
+    'brightness': { slider: 'c-brightness', label: 'v-brightness' },
+    'focusDistance': { slider: 'c-focus-dist', label: 'v-focus-dist' },
+    'colorTemperature': { slider: 'c-color-temp', label: 'v-color-temp' },
+    'saturation': { slider: 'c-saturation', label: 'v-saturation' },
+    'contrast': { slider: 'c-contrast', label: 'v-contrast' },
+    'sharpness': { slider: 'c-sharpness', label: 'v-sharpness' },
+  };
+
+  for (const [prop, ui] of Object.entries(controlMap)) {
+    const el = document.getElementById(ui.slider);
+    if (!el) continue;
+    const cap = capabilities[prop];
+    if (cap && typeof cap === 'object' && 'min' in cap) {
+      el.min = cap.min;
+      el.max = cap.max;
+      if (cap.step) el.step = cap.step;
+      el.disabled = false;
+      if (settings[prop] !== undefined) {
+        el.value = settings[prop];
+        const lbl = document.getElementById(ui.label);
+        if (lbl) lbl.textContent = ui.fmt ? ui.fmt(settings[prop]) : settings[prop];
+      }
+    } else {
+      el.disabled = true;
+      const lbl = document.getElementById(ui.label);
+      if (lbl) lbl.textContent = 'N/A';
+    }
+  }
 }
 
+async function setCamProp(prop, value) {
+  if (!videoTrack) return;
+  try {
+    await videoTrack.applyConstraints({ advanced: [{ [prop]: value }] });
+    const labelMap = {
+      zoom: { id: 'v-zoom', fmt: v => (+v).toFixed(1)+'x' },
+      exposureCompensation: { id: 'v-exp-comp', fmt: v => (+v).toFixed(1) },
+      iso: { id: 'v-iso' },
+      exposureTime: { id: 'v-shutter' },
+      brightness: { id: 'v-brightness' },
+      focusDistance: { id: 'v-focus-dist' },
+      colorTemperature: { id: 'v-color-temp' },
+      saturation: { id: 'v-saturation' },
+      contrast: { id: 'v-contrast' },
+      sharpness: { id: 'v-sharpness' },
+      exposureMode: { id: 'v-exp-mode' },
+      focusMode: { id: 'v-focus-mode' },
+      whiteBalanceMode: { id: 'v-wb-mode' },
+      torch: { id: 'v-torch', fmt: v => v ? 'on' : 'off' },
+    };
+    const m = labelMap[prop];
+    if (m) {
+      const el = document.getElementById(m.id);
+      if (el) el.textContent = m.fmt ? m.fmt(value) : value;
+    }
+  } catch(e) { console.warn('setCamProp failed:', prop, e); }
+}
+
+function applyFilter(f) {
+  document.getElementById('cam-video').style.filter = f === 'none' ? '' : f;
+  document.getElementById('v-filter').textContent = document.getElementById('c-filter').selectedOptions[0].text;
+}
+
+// ===== TELEPROMPTER =====
 function startScrollLoop() {
-  if (animFrameId) cancelAnimationFrame(animFrameId);
-  lastTime = 0;
-
-  function loop(timestamp) {
-    if (!lastTime) lastTime = timestamp;
-    const dt = (timestamp - lastTime) / 1000;
-    lastTime = timestamp;
-
+  if (animId) cancelAnimationFrame(animId);
+  lastT = 0;
+  function loop(ts) {
+    if (!lastT) lastT = ts;
+    const dt = (ts - lastT) / 1000;
+    lastT = ts;
     pollGamepad();
-
     if (isScrolling) {
       scrollPos += scrollSpeed * dt;
-      const maxScroll = prompterText.scrollHeight - window.innerHeight * 0.5;
-      if (scrollPos > maxScroll) scrollPos = maxScroll;
-      prompterText.style.transform = `translateY(${-scrollPos}px)`;
+      const maxS = document.getElementById('prompter-body').scrollHeight - window.innerHeight * 0.5;
+      if (scrollPos > maxS) scrollPos = maxS;
+      document.getElementById('prompter-body').style.transform = `translateY(${-scrollPos}px)`;
     }
-
-    animFrameId = requestAnimationFrame(loop);
+    animId = requestAnimationFrame(loop);
   }
-
-  animFrameId = requestAnimationFrame(loop);
-}
-
-function toggleRecording() {
-  if (isRecording) stopRecording();
-  else startRecording();
-}
-
-function startRecording() {
-  if (!stream) return;
-
-  recordedChunks = [];
-  const mimeTypes = [
-    'video/mp4;codecs=h264,aac',
-    'video/mp4',
-    'video/webm;codecs=vp9,opus',
-    'video/webm;codecs=vp8,opus',
-    'video/webm'
-  ];
-
-  let options = {};
-  for (const mt of mimeTypes) {
-    if (MediaRecorder.isTypeSupported(mt)) {
-      options = { mimeType: mt };
-      break;
-    }
-  }
-
-  try {
-    mediaRecorder = new MediaRecorder(stream, options);
-  } catch (e) {
-    mediaRecorder = new MediaRecorder(stream);
-  }
-
-  mediaRecorder.ondataavailable = e => {
-    if (e.data.size > 0) recordedChunks.push(e.data);
-  };
-
-  mediaRecorder.onstop = () => {
-    const mimeType = mediaRecorder.mimeType || 'video/webm';
-    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-    const blob = new Blob(recordedChunks, { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `video_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.${ext}`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  mediaRecorder.start(1000);
-  isRecording = true;
-  recStartTime = Date.now();
-  recIndicator.classList.add('active');
-  btnRecord.classList.add('recording');
-  updateRecTimer();
-  recTimerInterval = setInterval(updateRecTimer, 1000);
-}
-
-function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-  }
-  isRecording = false;
-  recIndicator.classList.remove('active');
-  btnRecord.classList.remove('recording');
-  clearInterval(recTimerInterval);
-}
-
-function updateRecTimer() {
-  const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
-  const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const s = String(elapsed % 60).padStart(2, '0');
-  recTimer.textContent = `${m}:${s}`;
+  animId = requestAnimationFrame(loop);
 }
 
 function toggleScroll() {
   isScrolling = !isScrolling;
-  btnPause.textContent = isScrolling ? '⏸' : '▶';
+  document.getElementById('btn-pause').textContent = isScrolling ? '⏸' : '▶';
 }
 
 function resetScroll() {
   scrollPos = 0;
-  prompterText.style.transform = 'translateY(0)';
+  document.getElementById('prompter-body').style.transform = 'translateY(0)';
   isScrolling = true;
-  btnPause.textContent = '⏸';
+  document.getElementById('btn-pause').textContent = '⏸';
 }
 
-function adjustSpeed(delta) {
-  scrollSpeed = Math.max(5, Math.min(150, scrollSpeed + delta));
-  speedDisplay.textContent = `⏩ ${scrollSpeed} px/s`;
+function adjustSpeed(d) {
+  scrollSpeed = Math.max(5, Math.min(150, scrollSpeed + d));
+  document.getElementById('spd-badge').textContent = `⏩ ${scrollSpeed}`;
 }
 
-function adjustSize(delta) {
-  textSize = Math.max(14, Math.min(60, textSize + delta));
-  document.documentElement.style.setProperty('--text-size', textSize + 'px');
+function adjustSize(d) {
+  textSize = Math.max(14, Math.min(60, textSize + d));
+  document.getElementById('prompter-body').style.fontSize = textSize + 'px';
 }
 
-function adjustOpacity(delta) {
-  textOpacity = Math.max(0.1, Math.min(1, textOpacity + delta));
-  prompterText.style.opacity = textOpacity;
+function adjustOpacity(d) {
+  textOpacity = Math.max(0.1, Math.min(1, textOpacity + d));
+  document.getElementById('prompter-body').style.opacity = textOpacity;
 }
 
-function toggleHud() {
-  hudVisible = !hudVisible;
-  hud.classList.toggle('hidden', !hudVisible);
-  speedDisplay.style.display = hudVisible ? '' : 'none';
+// ===== RECORDING =====
+function toggleRec() {
+  if (isRecording) stopRec(); else startRec();
 }
 
-function backToSetup() {
-  if (isRecording) stopRecording();
-  if (animFrameId) cancelAnimationFrame(animFrameId);
-  setup.classList.remove('hidden');
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+function startRec() {
+  if (!stream) return;
+  chunks = [];
+  const types = ['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm'];
+  let opts = {};
+  for (const t of types) { if (MediaRecorder.isTypeSupported(t)) { opts = {mimeType:t}; break; } }
+  try { mediaRecorder = new MediaRecorder(stream, opts); } catch(e) { mediaRecorder = new MediaRecorder(stream); }
+  mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const mt = mediaRecorder.mimeType || 'video/webm';
+    const ext = mt.includes('mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(chunks, {type: mt});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `video_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.${ext}`;
+    a.click();
+  };
+  mediaRecorder.start(1000);
+  isRecording = true;
+  recStart = Date.now();
+  document.getElementById('rec-badge').classList.add('on');
+  document.getElementById('btn-rec').classList.add('on');
+  updateRecTime();
+  recInterval = setInterval(updateRecTime, 1000);
 }
 
-// Gamepad support
+function stopRec() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  isRecording = false;
+  document.getElementById('rec-badge').classList.remove('on');
+  document.getElementById('btn-rec').classList.remove('on');
+  clearInterval(recInterval);
+}
+
+function updateRecTime() {
+  const s = Math.floor((Date.now() - recStart) / 1000);
+  document.getElementById('rec-time').textContent =
+    String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+}
+
+// ===== GAMEPAD =====
 window.addEventListener('gamepadconnected', e => {
-  gamepadIndex = e.gamepad.index;
-  gamepadStatus.classList.add('connected');
-  gamepadStatus.textContent = `🎮 ${e.gamepad.id.split('(')[0].trim()}`;
-  setTimeout(() => { gamepadStatus.style.display = 'none'; }, 3000);
+  gpIndex = e.gamepad.index;
+  document.getElementById('gp-indicator').classList.add('on');
+  document.getElementById('gp-indicator').textContent = '🎮 ' + e.gamepad.id.split('(')[0].trim();
 });
-
 window.addEventListener('gamepaddisconnected', () => {
-  gamepadIndex = -1;
-  gamepadStatus.classList.remove('connected');
+  gpIndex = -1;
+  document.getElementById('gp-indicator').classList.remove('on');
 });
 
 function pollGamepad() {
-  if (gamepadIndex < 0) return;
-  const gp = navigator.getGamepads()[gamepadIndex];
+  if (gpIndex < 0) return;
+  const gp = navigator.getGamepads()[gpIndex];
   if (!gp) return;
+  const btns = gp.buttons.map(b => b.pressed);
+  const jp = i => btns[i] && !prevBtns[i];
 
-  const buttons = gp.buttons.map(b => b.pressed);
+  if (jp(0)) toggleRec();
+  if (jp(1)) toggleScroll();
+  if (jp(3)) resetScroll();
+  if (jp(2)) toggleControls('cam-controls');
+  if (jp(9)) backToMenu();
+  if (jp(12)) adjustSpeed(5);
+  if (jp(13)) adjustSpeed(-5);
+  if (jp(14)) adjustSize(-2);
+  if (jp(15)) adjustSize(2);
+  if (jp(4)) adjustOpacity(-0.1);
+  if (jp(5)) adjustOpacity(0.1);
 
-  function justPressed(i) {
-    return buttons[i] && (!prevButtons[i]);
-  }
+  // L2/R2 for zoom
+  if (jp(6)) setCamProp('zoom', Math.max(1, (+document.getElementById('c-zoom').value) - 0.5));
+  if (jp(7)) setCamProp('zoom', Math.min(10, (+document.getElementById('c-zoom').value) + 0.5));
 
-  // DualShock 4 mapping (standard):
-  // 0=Cross, 1=Circle, 2=Square, 3=Triangle
-  // 4=L1, 5=R1, 6=L2, 7=R2
-  // 8=Share, 9=Options, 10=L3, 11=R3
-  // 12=DUp, 13=DDown, 14=DLeft, 15=DRight
-  // 16=PS button
-
-  if (justPressed(0)) toggleRecording();       // Cross
-  if (justPressed(1)) toggleScroll();           // Circle
-  if (justPressed(3)) resetScroll();            // Triangle
-  if (justPressed(2)) toggleHud();              // Square
-  if (justPressed(9)) backToSetup();            // Options
-
-  if (justPressed(12)) adjustSpeed(5);          // D-Up
-  if (justPressed(13)) adjustSpeed(-5);         // D-Down
-  if (justPressed(14)) adjustSize(-2);          // D-Left
-  if (justPressed(15)) adjustSize(2);           // D-Right
-
-  if (justPressed(4)) adjustOpacity(-0.1);      // L1
-  if (justPressed(5)) adjustOpacity(0.1);       // R1
-
-  prevButtons = [...buttons];
+  prevBtns = [...btns];
 }
 
-// Settings UI handlers
-document.getElementById('speed-range').addEventListener('input', e => {
-  document.getElementById('speed-value').textContent = e.target.value;
-});
-
-document.getElementById('size-range').addEventListener('input', e => {
-  document.getElementById('size-value').textContent = e.target.value + 'px';
-});
-
-document.getElementById('mirror-toggle').addEventListener('click', function() {
-  isMirrored = !isMirrored;
-  this.classList.toggle('on', isMirrored);
-  camera.style.transform = isMirrored ? 'scaleX(-1)' : 'none';
-});
-
-// Keyboard fallback
+// ===== KEYBOARD =====
 document.addEventListener('keydown', e => {
-  if (setup.classList.contains('hidden')) {
-    switch(e.code) {
-      case 'Space': e.preventDefault(); toggleRecording(); break;
-      case 'KeyP': toggleScroll(); break;
-      case 'KeyR': resetScroll(); break;
-      case 'ArrowUp': adjustSpeed(5); break;
-      case 'ArrowDown': adjustSpeed(-5); break;
-      case 'ArrowLeft': adjustSize(-2); break;
-      case 'ArrowRight': adjustSize(2); break;
-      case 'Escape': backToSetup(); break;
-      case 'KeyH': toggleHud(); break;
-    }
+  if (mode !== 'camera' || !document.getElementById('camera-live').classList.contains('active')) return;
+  switch(e.code) {
+    case 'Space': e.preventDefault(); toggleRec(); break;
+    case 'KeyP': toggleScroll(); break;
+    case 'KeyR': resetScroll(); break;
+    case 'ArrowUp': adjustSpeed(5); break;
+    case 'ArrowDown': adjustSpeed(-5); break;
+    case 'Escape': backToMenu(); break;
+    case 'KeyH': toggleControls('cam-controls'); break;
   }
 });
 
-// Prevent screen sleep via Wake Lock API
-async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) {
-      await navigator.wakeLock.request('screen');
+// ===== PEER (CAMERA SIDE) =====
+function initPeerCamera() {
+  roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const display = document.getElementById('room-display');
+  display.textContent = '📡 ' + roomCode;
+  display.style.display = '';
+
+  peer = new Peer('tcam-' + roomCode, { debug: 0 });
+  peer.on('error', e => console.warn('Peer error:', e));
+
+  peer.on('connection', conn => {
+    dataConn = conn;
+    document.getElementById('conn-badge').classList.add('on');
+    conn.on('data', handleRemoteCmd);
+    conn.on('close', () => document.getElementById('conn-badge').classList.remove('on'));
+  });
+
+  peer.on('call', call => {
+    call.answer(stream);
+    mediaConn = call;
+  });
+}
+
+function handleRemoteCmd(data) {
+  if (!data || !data.cmd) return;
+  const { cmd, value } = data;
+  switch(cmd) {
+    case 'toggleRec': toggleRec(); break;
+    case 'toggleScroll': toggleScroll(); break;
+    case 'resetScroll': resetScroll(); break;
+    case 'scrollSpeed':
+      if (value === 'inc') adjustSpeed(5);
+      else if (value === 'dec') adjustSpeed(-5);
+      else { scrollSpeed = value; document.getElementById('spd-badge').textContent = `⏩ ${scrollSpeed}`; }
+      break;
+    default:
+      setCamProp(cmd, value);
+  }
+}
+
+// ===== PEER (MONITOR SIDE) =====
+function connectMonitor() {
+  const code = document.getElementById('room-input').value.trim().toUpperCase();
+  if (!code) return;
+  document.getElementById('monitor-status').textContent = 'Conectando...';
+
+  peer = new Peer(undefined, { debug: 0 });
+  peer.on('open', () => {
+    dataConn = peer.connect('tcam-' + code, { reliable: true });
+    dataConn.on('open', () => {
+      document.getElementById('monitor-status').textContent = 'Conectado! Abrindo vídeo...';
+      mediaConn = peer.call('tcam-' + code, createEmptyStream());
+      mediaConn.on('stream', remoteStream => {
+        document.getElementById('mon-video').srcObject = remoteStream;
+        showScreen('monitor-live');
+      });
+    });
+    dataConn.on('error', e => {
+      document.getElementById('monitor-status').textContent = 'Erro: ' + e;
+    });
+  });
+  peer.on('error', e => {
+    document.getElementById('monitor-status').textContent = 'Erro: ' + e.type;
+  });
+}
+
+function createEmptyStream() {
+  const ctx = new AudioContext();
+  const osc = ctx.createOscillator();
+  const dst = ctx.createMediaStreamDestination();
+  osc.connect(dst);
+  osc.start();
+  const c = document.createElement('canvas');
+  c.width = 1; c.height = 1;
+  const vs = c.captureStream();
+  return new MediaStream([...vs.getTracks(), ...dst.stream.getTracks()]);
+}
+
+function sendCmd(cmd, value) {
+  if (dataConn && dataConn.open) {
+    dataConn.send({ cmd, value });
+    const labelMap = {
+      exposureCompensation: 'mv-exp-comp',
+      iso: 'mv-iso',
+      brightness: 'mv-brightness',
+      focusDistance: 'mv-focus-dist',
+      colorTemperature: 'mv-color-temp',
+      saturation: 'mv-saturation',
+      contrast: 'mv-contrast',
+      zoom: 'mv-zoom',
+      scrollSpeed: 'mv-speed',
+    };
+    if (labelMap[cmd]) {
+      const el = document.getElementById(labelMap[cmd]);
+      if (el) el.textContent = cmd === 'zoom' ? (+value).toFixed(1)+'x' : value;
     }
-  } catch (e) {}
+  }
+}
+
+// ===== UTILS =====
+function backToMenu() {
+  if (isRecording) stopRec();
+  if (animId) cancelAnimationFrame(animId);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (peer) { peer.destroy(); peer = null; }
+  stream = null; videoTrack = null;
+  document.getElementById('room-display').style.display = 'none';
+  showScreen('mode-select');
+  document.getElementById('mode-select').style.display = 'flex';
+}
+
+async function requestWakeLock() {
+  try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch(e) {}
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && !setup.classList.contains('hidden')) {
-    requestWakeLock();
-  }
+  if (document.visibilityState === 'visible' && mode === 'camera') requestWakeLock();
 });
 
-// Init
-loadCameras();
+// Setup sliders display
+document.getElementById('set-speed').addEventListener('input', e => {
+  document.getElementById('set-speed-val').textContent = e.target.value;
+});
+document.getElementById('set-size').addEventListener('input', e => {
+  document.getElementById('set-size-val').textContent = e.target.value + 'px';
+});
 </script>
 </body>
 </html>
