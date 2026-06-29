@@ -793,37 +793,40 @@ function readCapabilities() {
 
   const settings = videoTrack.getSettings();
   const controlMap = {
-    'zoom': { slider: 'c-zoom', label: 'v-zoom', fmt: v => v.toFixed(1)+'x' },
-    'exposureCompensation': { slider: 'c-exp-comp', label: 'v-exp-comp', fmt: v => v.toFixed(1) },
-    'iso': { slider: 'c-iso', label: 'v-iso' },
-    'exposureTime': { slider: 'c-shutter', label: 'v-shutter' },
-    'brightness': { slider: 'c-brightness', label: 'v-brightness' },
-    'focusDistance': { slider: 'c-focus-dist', label: 'v-focus-dist' },
-    'colorTemperature': { slider: 'c-color-temp', label: 'v-color-temp' },
-    'saturation': { slider: 'c-saturation', label: 'v-saturation' },
-    'contrast': { slider: 'c-contrast', label: 'v-contrast' },
-    'sharpness': { slider: 'c-sharpness', label: 'v-sharpness' },
+    'zoom': { slider: 'c-zoom', label: 'v-zoom', fmt: v => v.toFixed(1)+'x', min: 1, max: 10, step: 0.1 },
+    'exposureCompensation': { slider: 'c-exp-comp', label: 'v-exp-comp', fmt: v => (+v).toFixed(1), min: -3, max: 3, step: 0.1 },
+    'iso': { slider: 'c-iso', label: 'v-iso', min: 50, max: 3200, step: 50 },
+    'exposureTime': { slider: 'c-shutter', label: 'v-shutter', min: 100, max: 100000, step: 100 },
+    'brightness': { slider: 'c-brightness', label: 'v-brightness', min: 0, max: 255, step: 1 },
+    'focusDistance': { slider: 'c-focus-dist', label: 'v-focus-dist', min: 0, max: 1000, step: 10 },
+    'colorTemperature': { slider: 'c-color-temp', label: 'v-color-temp', min: 2500, max: 10000, step: 100 },
+    'saturation': { slider: 'c-saturation', label: 'v-saturation', min: 0, max: 255, step: 1 },
+    'contrast': { slider: 'c-contrast', label: 'v-contrast', min: 0, max: 255, step: 1 },
+    'sharpness': { slider: 'c-sharpness', label: 'v-sharpness', min: 0, max: 255, step: 1 },
   };
 
   for (const [prop, ui] of Object.entries(controlMap)) {
     const el = document.getElementById(ui.slider);
     if (!el) continue;
     const cap = capabilities[prop];
-    if (cap && typeof cap === 'object' && 'min' in cap) {
+    const supported = cap && typeof cap === 'object' && 'min' in cap;
+    if (supported) {
       el.min = cap.min;
       el.max = cap.max;
       if (cap.step) el.step = cap.step;
-      el.disabled = false;
-      if (settings[prop] !== undefined) {
-        el.value = settings[prop];
-        const lbl = document.getElementById(ui.label);
-        if (lbl) lbl.textContent = ui.fmt ? ui.fmt(settings[prop]) : settings[prop];
-      }
     } else {
-      el.disabled = true;
-      const lbl = document.getElementById(ui.label);
-      if (lbl) lbl.textContent = 'N/A';
+      el.min = ui.min;
+      el.max = ui.max;
+      el.step = ui.step;
     }
+    el.disabled = false;
+    if (settings[prop] !== undefined) {
+      el.value = settings[prop];
+      const lbl = document.getElementById(ui.label);
+      if (lbl) lbl.textContent = ui.fmt ? ui.fmt(settings[prop]) : settings[prop];
+    }
+    const lbl = document.getElementById(ui.label);
+    if (lbl && lbl.textContent === 'N/A') lbl.textContent = ui.fmt ? ui.fmt(+el.value) : el.value;
   }
 }
 
