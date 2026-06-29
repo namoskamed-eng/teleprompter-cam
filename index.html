@@ -295,6 +295,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, sy
     <div class="info-row"><span class="k">D-Pad ←→</span><span class="v">Tamanho texto</span></div>
     <div class="info-row"><span class="k">L1 / R1</span><span class="v">Opacidade texto</span></div>
     <div class="info-row"><span class="k">L2 / R2</span><span class="v">Zoom -/+</span></div>
+    <div class="info-row"><span class="k">L3 / R3</span><span class="v">Trocar lente ←/→</span></div>
     <div class="info-row"><span class="k">Options</span><span class="v">Voltar ao menu</span></div>
   </div>
 
@@ -394,8 +395,12 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, sy
       </div>
     </div>
 
-    <!-- Zoom -->
+    <!-- Zoom & Lentes -->
     <div class="ctrl-panel" id="tab-zoom">
+      <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Lente</span><span id="v-lens">—</span></div>
+        <select id="c-lens" onchange="switchLens(this.value)"></select>
+      </div>
       <div class="ctrl-slider">
         <div class="ctrl-label"><span>Zoom</span><span id="v-zoom">1.0x</span></div>
         <input type="range" id="c-zoom" min="1" max="10" step="0.1" value="1" oninput="setCamProp('zoom',+this.value)">
@@ -517,6 +522,10 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, sy
 
     <div class="ctrl-panel" id="mtab-zoom">
       <div class="ctrl-slider">
+        <div class="ctrl-label"><span>Lente</span></div>
+        <select id="mc-lens" onchange="sendCmd('switchLens',this.value)"></select>
+      </div>
+      <div class="ctrl-slider">
         <div class="ctrl-label"><span>Zoom</span><span id="mv-zoom">1.0x</span></div>
         <input type="range" id="mc-zoom" min="1" max="10" step="0.1" value="1" oninput="sendCmd('zoom',+this.value)">
       </div>
@@ -631,23 +640,101 @@ function toggleControls(id) {
 }
 
 // ===== CAMERA =====
+let allCameras = [];
+
+function labelCamera(label, index) {
+  const l = label.toLowerCase();
+  if (/front|frontal|selfie|facetime/i.test(label)) return '📷 Frontal';
+  if (/ultra.?wide|ultra.?angular|0\.5/i.test(label)) return '📷 Ultra Wide (0.5x)';
+  if (/telephoto|tele|zoom|2x|3x|5x/i.test(label)) {
+    const m = label.match(/(\d+(?:\.\d+)?)\s*x/i);
+    return '📷 Tele' + (m ? ` (${m[1]}x)` : '');
+  }
+  if (/back|traseira|rear|environment/i.test(label)) return '📷 Wide (1x)';
+  return label || `📷 Câmera ${index+1}`;
+}
+
 async function loadCameras() {
   try {
     const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     tempStream.getTracks().forEach(t => t.stop());
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const vids = devices.filter(d => d.kind === 'videoinput');
-    const sel = document.getElementById('cam-select');
-    sel.innerHTML = '';
-    vids.forEach((d, i) => {
-      const o = document.createElement('option');
-      o.value = d.deviceId;
-      o.textContent = d.label || `Câmera ${i+1}`;
-      sel.appendChild(o);
-    });
-    const back = vids.find(d => /back|traseira|rear|environment/i.test(d.label));
-    if (back) sel.value = back.deviceId;
+    allCameras = devices.filter(d => d.kind === 'videoinput');
+    populateCamSelect('cam-select');
+    populateCamSelect('c-lens');
+    populateCamSelect('mc-lens');
+    const back = allCameras.find(d => /back|traseira|rear|environment/i.test(d.label) && !/ultra|tele/i.test(d.label));
+    if (back) {
+      ['cam-select','c-lens','mc-lens'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = back.deviceId;
+      });
+    }
   } catch(e) { console.error(e); }
+}
+
+function populateCamSelect(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '';
+  allCameras.forEach((d, i) => {
+    const o = document.createElement('option');
+    o.value = d.deviceId;
+    o.textContent = labelCamera(d.label, i);
+    sel.appendChild(o);
+  });
+}
+
+async function switchLens(deviceId) {
+  if (!deviceId) return;
+  const wasRecording = isRecording;
+  const vid = document.getElementById('cam-video');
+
+  const audioTrack = stream ? stream.getAudioTracks()[0] : null;
+
+  try {
+    const newStream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: {exact: deviceId}, width: {ideal: 1920}, height: {ideal: 1080} },
+      audio: audioTrack ? false : true
+    });
+
+    const newVideoTrack = newStream.getVideoTracks()[0];
+
+    if (stream && audioTrack) {
+      stream.getVideoTracks().forEach(t => t.stop());
+      stream.removeTrack(stream.getVideoTracks()[0]);
+      stream.addTrack(newVideoTrack);
+    } else {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = newStream;
+    }
+
+    vid.srcObject = stream;
+    videoTrack = newVideoTrack;
+    readCapabilities();
+
+    ['c-lens','cam-select'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = deviceId;
+    });
+    const lbl = document.getElementById('v-lens');
+    const opt = document.querySelector(`#c-lens option[value="${deviceId}"]`);
+    if (lbl && opt) lbl.textContent = opt.textContent;
+
+    if (mediaConn && peer) {
+      const oldCall = mediaConn;
+      mediaConn = peer.call(dataConn.peer, stream);
+      setTimeout(() => { try { oldCall.close(); } catch(e){} }, 500);
+    }
+  } catch(e) { console.warn('switchLens failed:', e); }
+}
+
+function cycleLens(dir) {
+  if (allCameras.length < 2) return;
+  const sel = document.getElementById('c-lens');
+  let idx = allCameras.findIndex(c => c.deviceId === sel.value);
+  idx = (idx + dir + allCameras.length) % allCameras.length;
+  switchLens(allCameras[idx].deviceId);
 }
 
 async function startCamera() {
@@ -899,6 +986,9 @@ function pollGamepad() {
   if (jp(6)) setCamProp('zoom', Math.max(1, (+document.getElementById('c-zoom').value) - 0.5));
   if (jp(7)) setCamProp('zoom', Math.min(10, (+document.getElementById('c-zoom').value) + 0.5));
 
+  // L3/R3 to cycle lenses
+  if (jp(10) || jp(11)) cycleLens(jp(11) ? 1 : -1);
+
   prevBtns = [...btns];
 }
 
@@ -946,6 +1036,7 @@ function handleRemoteCmd(data) {
     case 'toggleRec': toggleRec(); break;
     case 'toggleScroll': toggleScroll(); break;
     case 'resetScroll': resetScroll(); break;
+    case 'switchLens': switchLens(value); break;
     case 'scrollSpeed':
       if (value === 'inc') adjustSpeed(5);
       else if (value === 'dec') adjustSpeed(-5);
